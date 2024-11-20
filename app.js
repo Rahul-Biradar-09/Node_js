@@ -167,30 +167,39 @@ app.get('/user/followers/', authenticatetoken, async (request, response) => {
 
 //6th API(GET):-
 
-app.get('/tweets/:tweetId/', authenticatetoken, async (request, response) => {
-  let {username} = request
+app.get("/tweets/:tweetId/", authenticatetoken, async (request, response) => {
+  const { username } = request;
+  const { tweetId } = request.params;
 
-  let {tweetId} = request.params
 
-  let clause = `SELECT tweet.tweet AS tweet,
-  COUNT(like.tweet_id) AS likes,
-  COUNT(reply.tweet_id) AS replies,
-  tweet.date_time AS dateTime
-  FROM user JOIN follower ON user.user_id = follower.following_user_id 
-  JOIN tweet ON follower.following_user_id = tweet.user_id
-  JOIN reply ON tweet.tweet_id = reply.tweet_id 
-  JOIN like ON reply.user_id = like.user_id
-  WHERE user.username = "${username}" AND tweet.tweet_id = ${tweetId};`
+  const userQuery = `SELECT user_id FROM user WHERE username = "${username}";`;
+  const userResult = await db_object.get(userQuery);
+  const loggedInUserId = userResult.user_id;
 
-  let res_object = await db_object.get(clause)
 
-  if (res_object.tweetId === tweetId) {
-    response.send(res_object)
+  const tweetQuery = `
+    SELECT tweet.user_id 
+    FROM tweet 
+    WHERE tweet_id = ${tweetId};
+  `;
+  const tweetResult = await db_object.get(tweetQuery);
+
+
+  const followerQuery = `
+    SELECT following_user_id 
+    FROM follower 
+    WHERE follower_user_id = ${loggedInUserId};
+  `;
+  const followers = await db_object.all(followerQuery);
+
+
+  if (followers.some((item) => item.following_user_id === tweetResult.user_id)) {
+    response.send(tweetResult);
   } else {
-    response.status(401)
-    response.send('Invalid Request')
+    response.status(401).send("Invalid Request");
   }
-})
+});
+
 
 //7th API(GET):-
 
@@ -280,24 +289,26 @@ app.post('/user/tweets/', authenticatetoken, async (request, response) => {
 
 //11th API(DELETE):-
 
-app.delete("/tweets/:tweetId/", authenticatetoken, async (request, response) => {
-  let { username } = request;
-  let { tweetId } = request.params;
+app.delete(
+  '/tweets/:tweetId/',
+  authenticatetoken,
+  async (request, response) => {
+    let {username} = request
+    let {tweetId} = request.params
 
-
-  let clause = `SELECT * FROM tweet 
+    let clause = `SELECT * FROM tweet 
                 JOIN user ON tweet.user_id = user.user_id 
-                WHERE tweet.tweet_id = ${tweetId} AND user.username = "${username}";`;
-  let res_object = await db_object.get(clause);
+                WHERE tweet.tweet_id = ${tweetId} AND user.username = "${username}";`
+    let res_object = await db_object.get(clause)
 
-
-  if (res_object) {
-    let query = `DELETE FROM tweet WHERE tweet_id = ${tweetId};`;
-    await db_object.run(query);
-    response.send("Tweet Removed");
-  } else {
-    response.status(401).send("Invalid Request");
-  }
-});
+    if (res_object) {
+      let query = `DELETE FROM tweet WHERE tweet_id = ${tweetId};`
+      await db_object.run(query)
+      response.send('Tweet Removed')
+    } else {
+      response.status(401).send('Invalid Request')
+    }
+  },
+)
 
 module.exports = app
