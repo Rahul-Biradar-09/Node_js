@@ -141,16 +141,25 @@ app.get('/user/tweets/feed/', authenticatetoken, async (request, response) => {
 
 //4th API(GET):-
 
-app.get('/user/following/', authenticatetoken, async (request, response) => {
-  let {username} = request
+app.get("/user/following/", authenticatetoken, async (request, response) => {
+  let { username } = request;
 
-  let clause = `SELECT user.name AS name
-  FROM user JOIN follower ON user.user_id = follower.following_user_id
-  WHERE user.username = "${username}";`
 
-  let res_object = await db_object.all(clause)
-  response.send(res_object)
-})
+  let clause = `
+  SELECT user.name AS name 
+  FROM user 
+  JOIN follower ON user.user_id = follower.following_user_id 
+  WHERE follower.follower_user_id = (
+      SELECT user_id FROM user WHERE username = "${username}"
+  );
+`;
+
+
+
+  let res_object = await db_object.all(clause);
+  response.send(res_object);
+});
+
 
 //5th API(GET):-
 
