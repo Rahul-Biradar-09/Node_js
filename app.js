@@ -240,31 +240,36 @@ app.get(
 
 //8th API(GET):-
 
-app.get(
-  '/tweets/:tweetId/replies/',
-  authenticatetoken,
-  async (request, response) => {
-    let {username} = request
+app.get('/tweets/:tweetId/replies/', authenticatetoken, async (request, response) => {
+  const { username } = request;
+  const { tweetId } = request.params;
 
-    let {tweetId} = request.params
+  const query = `
+    SELECT tweet.tweet_id
+    FROM tweet
+    JOIN follower ON tweet.user_id = follower.following_user_id
+    WHERE follower.follower_user_id = (
+      SELECT user_id FROM user WHERE username = "${username}"
+    )
+    AND tweet.tweet_id = ${tweetId};
+  `;
+  const isTweetAccessible = await db_object.get(query);
 
-    let clause = `SELECT
-  user.username AS likes
-  FROM user JOIN follower ON user.user_id = follower.following_user_id 
-  JOIN tweet ON follower.following_user_id = tweet.user_id
-  JOIN reply ON tweet.user_id = reply.user_id
-  WHERE user.username = "${username}" AND tweet.tweet_id = ${tweetId};`
 
-    let res_object = await db_object.get(clause)
+  if (!isTweetAccessible) {
+    response.status(401).send('Invalid Request');
+    return;
+  }
 
-    if (res_object.tweetId === tweetId) {
-      response.send(res_object)
-    } else {
-      response.status(401)
-      response.send('Invalid Request')
-    }
-  },
-)
+  const replyQuery = `
+    SELECT user.name AS name, reply.reply AS reply
+    FROM reply
+    JOIN user ON reply.user_id = user.user_id
+    WHERE reply.tweet_id = ${tweetId};
+  `;
+  const replies = await db_object.all(replyQuery);
+  response.send({ replies });
+});
 
 //9th API(GET):-
 
