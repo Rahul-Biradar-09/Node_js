@@ -212,31 +212,43 @@ app.get("/tweets/:tweetId/", authenticatetoken, async (request, response) => {
 
 //7th API(GET):-
 
+
 app.get(
   '/tweets/:tweetId/likes/',
   authenticatetoken,
   async (request, response) => {
-    let {username} = request
+    try {
+      const { username } = request; 
+      const { tweetId } = request.params;
+     
+      const clause = `
+        SELECT user.username AS likes
+        FROM user
+        JOIN like ON user.user_id = like.user_id
+        JOIN tweet ON like.tweet_id = tweet.tweet_id
+        JOIN follower ON tweet.user_id = follower.following_user_id
+        WHERE follower.follower_user_id = 
+          (SELECT user_id FROM user WHERE username = '${username}')
+          AND tweet.tweet_id = ${tweetId};
+      `;
 
-    let {tweetId} = request.params
 
-    let clause = `SELECT
-  user.username AS likes
-  FROM user JOIN follower ON user.user_id = follower.following_user_id 
-  JOIN tweet ON follower.following_user_id = tweet.user_id
-  JOIN like ON tweet.user_id = like.user_id
-  WHERE user.username = "${username}" AND tweet.tweet_id = ${tweetId};`
+      const res_array = await db_object.all(clause); 
 
-    let res_object = await db_object.get(clause)
 
-    if (res_object.tweetId === tweetId) {
-      response.send(res_object)
-    } else {
-      response.status(401)
-      response.send('Invalid Request')
+      if (res_array.length === 0) {
+        response.status(401).send('Invalid Request');
+      } else {
+        const likes = res_array.map((row) => row.likes);
+        response.send({ likes });
+      }
+    } catch (error) {
+      console.error('Error:', error.message);
+      response.status(500).send('Server Error');
     }
-  },
-)
+  }
+);
+
 
 //8th API(GET):-
 
